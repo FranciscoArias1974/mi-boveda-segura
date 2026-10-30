@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Custodio Local de Credenciales - Bóveda de alta seguridad en cliente con Web Crypto API y almacenamiento en IndexedDB.">
+    <meta name="theme-color" content="#0f2942">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Custodio Local de Credenciales | Bóveda Segura</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.warn('Registro de Service Worker omitido:', err);
+                });
+            });
+        }
+    </script>
+</head>
+<body>
+
+    <!-- ======================================================================
+         SECCIÓN 1: PANTALLA DE AUTENTICACIÓN Y BLOQUEO DEL USUARIO/OPERADOR
+         ====================================================================== -->
+    <div id="auth-screen" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-shield-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <circle cx="12" cy="11" r="3"/>
+                        <path d="M12 14v3"/>
+                    </svg>
+                </div>
+                <h2 id="auth-title" class="auth-title">Custodio Local de Credenciales</h2>
+                <p id="auth-subtitle" class="auth-subtitle">Bóveda Criptográfica en Cliente (Zero-Knowledge)</p>
+                <div class="security-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span>AES-GCM 256 bits | PBKDF2 (100.000 iteraciones)</span>
+                </div>
+            </div>
+
+            <!-- Formulario de Configuración Inicial (Onboarding del Usuario/Operador) -->
+            <form id="onboarding-form" class="auth-form" style="display: none;">
+                <div class="form-group" style="margin-bottom: 1.15rem;">
+                    <label class="form-label" for="init-master-password">
+                        Contraseña Maestra del Usuario / Operador:
+                        <span class="form-label-hint">Mínimo 10 caracteres</span>
+                    </label>
+                    <div class="input-with-actions">
+                        <input type="password" id="init-master-password" class="form-control" placeholder="Introduce tu contraseña maestra..." required minlength="10" autocomplete="new-password">
+                        <div class="input-action-buttons">
+                            <button type="button" class="btn-tiny toggle-password-visibility" data-target="init-master-password" title="Alternar visibilidad" aria-label="Alternar visibilidad de contraseña">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="strength-meter">
+                        <div class="strength-bar-track">
+                            <div id="init-strength-bar" class="strength-bar-fill"></div>
+                        </div>
+                        <div class="strength-meta">
+                            <span id="init-strength-label">Fortaleza</span>
+                            <span id="init-strength-entropy">0 bits</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label class="form-label" for="init-master-password-confirm">Confirmar Contraseña Maestra:</label>
+                    <input type="password" id="init-master-password-confirm" class="form-control" placeholder="Repite la contraseña maestra..." required minlength="10" autocomplete="new-password">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label class="form-label" for="init-timeout-select">Bloqueo de Sesión por Inactividad:</label>
+                    <select id="init-timeout-select" class="form-control">
+                        <option value="3">3 Minutos de inactividad</option>
+                        <option value="5">5 Minutos de inactividad</option>
+                        <option value="10" selected>10 Minutos (Recomendado)</option>
+                        <option value="15">15 Minutos de inactividad</option>
+                        <option value="30">30 Minutos de inactividad</option>
+                    </select>
+                </div>
+
+                <div id="onboarding-bio-box" style="margin-bottom: 1.25rem; display: none;">
+                    <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; font-weight: 600; color: var(--primary-900); cursor: pointer; background: var(--primary-50); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--primary-100);">
+                        <input type="checkbox" id="init-enable-biometrics" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span>Activar acceso con Huella Digital (Touch ID / Windows Hello)</span>
+                    </label>
+                </div>
+
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.4;">
+                    <strong>Aviso de Seguridad:</strong> Como <em>Usuario / Operador</em>, tu contraseña maestra deriva la clave de cifrado local. Nadie (ni los desarrolladores) puede recuperar tus datos si la olvidas.
+                </p>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span>Inicializar Bóveda Cifrada</span>
+                </button>
+            </form>
+
+            <!-- Formulario de Desbloqueo (Login del Usuario/Operador con opción Dual: Huella o Contraseña) -->
+            <div id="unlock-container" style="display: none;">
+                <!-- Pestañas Selectoras de Método de Acceso -->
+                <div class="auth-method-tabs" id="auth-method-tabs">
+                    <button type="button" id="tab-btn-biometric" class="auth-tab-btn active">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 0-6.88 17.23l.11.1a1 1 0 0 0 1.41-1.42l-.11-.09A8 8 0 1 1 20 12a1 1 0 0 0 2 0A10 10 0 0 0 12 2z"/><path d="M12 6a6 6 0 0 0-4.13 10.34l.11.1a1 1 0 1 0 1.41-1.42l-.11-.09A4 4 0 1 1 16 12a1 1 0 0 0 2 0 6 6 0 0 0-6-6z"/><circle cx="12" cy="12" r="1.5"/></svg>
+                        <span>Huella Digital</span>
+                    </button>
+                    <button type="button" id="tab-btn-password" class="auth-tab-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Contraseña</span>
+                    </button>
+                </div>
+
+                <!-- Método 1: Desbloqueo con Huella Digital (Touch ID / Windows Hello / Android / iOS) -->
+                <div id="unlock-biometric-section" class="biometric-box">
+                    <button type="button" id="btn-trigger-biometrics" class="btn-biometric-touch" title="Toca para escanear tu huella digital">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a10 10 0 0 0-6.88 17.23l.11.1a1 1 0 0 0 1.41-1.42l-.11-.09A8 8 0 1 1 20 12a1 1 0 0 0 2 0A10 10 0 0 0 12 2z"/>
+                            <path d="M12 6a6 6 0 0 0-4.13 10.34l.11.1a1 1 0 1 0 1.41-1.42l-.11-.09A4 4 0 1 1 16 12a1 1 0 0 0 2 0 6 6 0 0 0-6-6z"/>
+                            <path d="M12 10a2 2 0 0 0-1.38 3.45l.11.1a1 1 0 1 0 1.41-1.42l-.11-.09A.5.5 0 0 1 12 11.5a.5.5 0 0 1 .5.5 1 1 0 0 0 2 0 2 2 0 0 0-2.5-1.94z"/>
+                        </svg>
+                    </button>
+                    <div class="biometric-status-msg" id="bio-status-msg">Toca el botón o sensor para verificar tu huella</div>
+                    <p class="biometric-hint">Compatible con Touch ID (MacBook Air), lector de huellas o Windows Hello.</p>
+                </div>
+
+                <!-- Método 2: Desbloqueo Tradicional con Contraseña Maestra -->
+                <form id="unlock-form" class="auth-form" style="display: none;">
+                    <div class="form-group" style="margin-bottom: 1.25rem;">
+                        <label class="form-label" for="unlock-password">Contraseña Maestra del Usuario / Operador:</label>
+                        <div class="input-with-actions">
+                            <input type="password" id="unlock-password" class="form-control" placeholder="Introduce tu contraseña maestra..." autocomplete="current-password">
+                            <div class="input-action-buttons">
+                                <button type="button" class="btn-tiny toggle-password-visibility" data-target="unlock-password" title="Alternar visibilidad" aria-label="Alternar visibilidad">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-unlock-submit" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                        <span>Desbloquear Bóveda</span>
+                    </button>
+                </form>
+
+                <div style="text-align: center; margin-top: 0.75rem;">
+                    <button type="button" id="btn-show-emergency-reset" class="btn-tiny" style="color: var(--text-muted); font-size: 0.775rem;">
+                        ¿Problemas para acceder? Restablecimiento de emergencia
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 2: ENCABEZADO DE APLICACIÓN Y ESTADO DE SESIÓN
+         ====================================================================== -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand-section">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                </div>
+                <div class="brand-info">
+                    <h1>Custodio Local de Credenciales</h1>
+                    <span>Gestor Cifrado en Reposo | Modo Local</span>
+                </div>
+            </div>
+
+            <div class="session-status">
+                <span class="status-dot" title="Sesión activa"></span>
+                <span id="session-operator-label" style="font-weight: 600; color: var(--text-primary);">Usuario / Operador</span>
+                <span style="color: var(--border-medium);">|</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem;">Bloqueo en:</span>
+                <span id="session-timer-display" class="inactivity-timer" title="Tiempo restante antes del bloqueo por inactividad">10:00</span>
+            </div>
+
+            <div class="header-actions">
+                <button type="button" id="btn-open-generator" class="btn btn-secondary" title="Generador seguro de contraseñas">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
+                    <span>Generador</span>
+                </button>
+
+                <button type="button" id="btn-open-print" class="btn btn-secondary" title="Generar reporte o imprimir lista de credenciales">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    <span>Reporte / Imprimir</span>
+                </button>
+
+                <button type="button" id="btn-open-backup" class="btn btn-secondary" title="Exportar o importar respaldos cifrados">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Respaldos</span>
+                </button>
+
+                <button type="button" id="btn-open-settings" class="btn-icon" title="Ajustes de inactividad y bóveda" aria-label="Ajustes">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+
+                <button type="button" id="btn-lock-session" class="btn btn-outline" title="Bloquear sesión inmediatamente y purgar memoria">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Bloquear</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ======================================================================
+         SECCIÓN 3: CONTENIDO PRINCIPAL Y BARRA DE HERRAMIENTAS
+         ====================================================================== -->
+    <main class="main-content">
+        <!-- Barra de Búsqueda y Filtros -->
+        <section class="toolbar">
+            <div class="toolbar-primary-row">
+                <div class="search-box">
+                    <span class="search-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </span>
+                    <input type="text" id="search-input" class="search-input" placeholder="Buscar en tiempo real por Servicio / Plataforma o User..." autocomplete="off">
+                    <button type="button" id="search-clear-btn" class="search-clear-btn" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+
+                <div class="toolbar-actions">
+                    <button type="button" id="btn-new-credential" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <span>Nueva Credencial</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-secondary-row">
+                <div class="category-pills">
+                    <button type="button" class="pill-btn active" data-category="ALL">Todas</button>
+                    <button type="button" class="pill-btn" data-category="Sistemas">Sistemas</button>
+                    <button type="button" class="pill-btn" data-category="Bases de Datos">Bases de Datos</button>
+                    <button type="button" class="pill-btn" data-category="Servidores">Servidores</button>
+                    <button type="button" class="pill-btn" data-category="Web">Web</button>
+                    <button type="button" class="pill-btn" data-category="Otros">Otros</button>
+                </div>
+
+                <div class="records-counter">
+                    <span>Mostrando</span>
+                    <span id="counter-filtered" class="counter-badge">0</span>
+                    <span>de</span>
+                    <span id="counter-total" style="font-weight: 600;">0</span>
+                    <span>credenciales custodiadas</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contenedor Dinámico de Credenciales -->
+        <section id="credentials-container" class="credentials-grid" aria-live="polite">
+            <!-- Las tarjetas se generan dinámicamente mediante js/app.js -->
+        </section>
+
+        <!-- Estado Vacío (Empty State) -->
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <h3 id="empty-title" class="empty-title">Sin registros que mostrar</h3>
+            <p id="empty-desc" class="empty-description">No se encontraron credenciales con los criterios de búsqueda aplicados o la bóveda aún está vacía.</p>
+            <button type="button" id="btn-empty-action" class="btn btn-primary">Registrar la Primera Credencial</button>
+        </div>
+    </main>
+
+    <!-- ======================================================================
+         SECCIÓN 4: MODAL DE CREACIÓN / EDICIÓN DE CREDENCIALES (CRUD)
+         ====================================================================== -->
+    <div id="modal-credential" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-cred-title">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modal-cred-title" class="modal-title">Registrar Credencial Externa</h3>
+                <button type="button" class="btn-icon close-modal" title="Cerrar modal" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <form id="credential-form">
+                <input type="hidden" id="cred-id">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="cred-service">Servicio / Plataforma: *</label>
+                            <input type="text" id="cred-service" class="form-control" placeholder="Ej: AWS Console, GitHub, Base Oracle" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="cred-category">Categoría:</label>
+                            <select id="cred-category" class="form-control">
+                                <option value="Sistemas">Sistemas</option>
+                                <option value="Bases de Datos">Bases de Datos</option>
+                                <option value="Servidores">Servidores</option>
+                                <option value="Web" selected>Web</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="cred-user">User (Nombre de Usuario / Identificador de la cuenta externa): *</label>
+                        <input type="text" id="cred-user" class="form-control" placeholder="Ej: admin_sys, operario@empresa.com, root" required autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="cred-password">Contraseña (Clave de acceso al servicio externo): *</label>
+                        <div class="input-with-actions">
+                            <input type="password" id="cred-password" class="form-control" placeholder="Introduce o genera una contraseña..." required autocomplete="new-password">
+                            <div class="input-action-buttons">
+                                <button type="button" id="btn-quick-generate-password" class="btn-tiny" title="Generar contraseña segura al instante">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                                    <span>Generar</span>
+                                </button>
+                                <button type="button" class="btn-tiny toggle-password-visibility" data-target="cred-password" title="Alternar visibilidad">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="strength-meter">
+                            <div class="strength-bar-track">
+                                <div id="cred-strength-bar" class="strength-bar-fill"></div>
+                            </div>
+                            <div class="strength-meta">
+                                <span id="cred-strength-label">Fortaleza</span>
+                                <span id="cred-strength-entropy">0 bits</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="cred-url">URL / Enlace del Servicio:</label>
+                        <input type="url" id="cred-url" class="form-control" placeholder="https://login.ejemplo.com" autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="cred-notes">Notas / Observaciones de Seguridad:</label>
+                        <textarea id="cred-notes" class="form-control" rows="3" placeholder="Información confidencial adicional (claves secundarias, tokens, instrucciones específicas de acceso)..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Guardar Credencial</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 5: MODAL DEL GENERADOR AVANZADO DE CONTRASEÑAS
+         ====================================================================== -->
+    <div id="modal-generator" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-gen-title">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modal-gen-title" class="modal-title">Generador Criptográfico de Contraseñas (CSPRNG)</h3>
+                <button type="button" class="btn-icon close-modal" title="Cerrar modal" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Resultado Generado:</label>
+                    <div class="field-value-row" style="padding: 0.75rem;">
+                        <span id="gen-result-display" class="field-text" style="font-size: 1.15rem; font-weight: 600; color: var(--primary-900);"></span>
+                        <div class="inline-actions">
+                            <button type="button" id="btn-copy-generated" class="btn btn-secondary btn-tiny" title="Copiar al portapapeles">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                <span>Copiar</span>
+                            </button>
+                            <button type="button" id="btn-refresh-generated" class="btn-icon" title="Generar otra clave" style="width: 32px; height: 32px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="strength-meter">
+                        <div class="strength-bar-track">
+                            <div id="gen-strength-bar" class="strength-bar-fill"></div>
+                        </div>
+                        <div class="strength-meta">
+                            <span id="gen-strength-label">Fuerte</span>
+                            <span id="gen-strength-entropy">Entropía: 128 bits</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="gen-length-range">
+                        Longitud de la Contraseña:
+                        <strong id="gen-length-label" style="color: var(--primary-700);">20 caracteres</strong>
+                    </label>
+                    <input type="range" id="gen-length-range" min="10" max="64" value="20" class="form-control" style="cursor: pointer;">
+                </div>
+
+                <div class="form-group" style="gap: 0.65rem;">
+                    <label class="form-label">Juegos de Caracteres Permitidos:</label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                        <input type="checkbox" id="gen-opt-uppercase" checked> Letras Mayúsculas (A-Z)
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                        <input type="checkbox" id="gen-opt-lowercase" checked> Letras Minúsculas (a-z)
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                        <input type="checkbox" id="gen-opt-numbers" checked> Dígitos Numéricos (0-9)
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                        <input type="checkbox" id="gen-opt-symbols" checked> Símbolos Especiales (!@#$%^&*...)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cerrar</button>
+                <button type="button" id="btn-use-generated-password" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Aplicar en Formulario</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 6: MODAL DE RESPALDOS (Exportación e Importación Cifrada)
+         ====================================================================== -->
+    <div id="modal-backup" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-backup-title">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modal-backup-title" class="modal-title">Gestión de Respaldos Cifrados</h3>
+                <button type="button" class="btn-icon close-modal" title="Cerrar modal" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Exportación -->
+                <div style="background: var(--bg-surface-alt); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <h4 style="font-size: 1rem; color: var(--primary-900); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Exportar Bóveda Completa</span>
+                    </h4>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                        Descarga un archivo JSON protegido con cifrado autenticado AES-GCM bajo la clave maestra del <strong>Usuario / Operador</strong>.
+                    </p>
+                    <button type="button" id="btn-export-backup" class="btn btn-primary" style="width: 100%;">
+                        <span>Descargar Respaldo Cifrado (.json)</span>
+                    </button>
+                </div>
+
+                <!-- Importación -->
+                <div style="background: var(--bg-surface-alt); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <h4 style="font-size: 1rem; color: var(--primary-900); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span>Restaurar desde Respaldo Cifrado</span>
+                    </h4>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                        Selecciona un archivo de respaldo generado previamente. Se validará la autenticidad con tu contraseña maestra activa.
+                    </p>
+                    <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;">
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button type="button" id="btn-trigger-file-input" class="btn btn-secondary" style="flex: 1;">
+                            <span>Seleccionar Archivo...</span>
+                        </button>
+                    </div>
+                    <div id="import-strategy-box" style="margin-top: 1rem; display: none;">
+                        <label class="form-label" for="import-strategy">Modo de Restauración:</label>
+                        <select id="import-strategy" class="form-control" style="margin-bottom: 0.75rem;">
+                            <option value="merge">Combinar (Conservar actuales y agregar/actualizar respaldadas)</option>
+                            <option value="replace">Sobrescribir Totalmente (Reemplazar la bóveda actual)</option>
+                        </select>
+                        <button type="button" id="btn-execute-import" class="btn btn-primary" style="width: 100%;">
+                            <span>Confirmar e Importar</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 7: MODAL DE CONFIGURACIÓN Y TIEMPO DE INACTIVIDAD
+         ====================================================================== -->
+    <div id="modal-settings" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modal-settings-title" class="modal-title">Configuración de Seguridad</h3>
+                <button type="button" class="btn-icon close-modal" title="Cerrar modal" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <form id="settings-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="settings-operator-name">Nombre / Identificador del Usuario / Operador:</label>
+                        <input type="text" id="settings-operator-name" class="form-control" placeholder="Ej: Operador Principal" value="Operador Autorizado">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="settings-inactivity-timeout">Tiempo de Bloqueo Automático por Inactividad:</label>
+                        <select id="settings-inactivity-timeout" class="form-control">
+                            <option value="1">1 Minuto (Máxima seguridad)</option>
+                            <option value="3">3 Minutos</option>
+                            <option value="5">5 Minutos</option>
+                            <option value="10">10 Minutos (Estándar recomendado)</option>
+                            <option value="15">15 Minutos</option>
+                            <option value="30">30 Minutos</option>
+                            <option value="60">60 Minutos</option>
+                        </select>
+                    </div>
+
+                    <!-- Configuración de Huella Digital / Biometría -->
+                    <div id="settings-biometrics-container" style="background: var(--bg-surface-alt); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-top: 0.5rem;">
+                        <h4 style="font-size: 0.95rem; color: var(--primary-900); font-weight: 700; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.45rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 0-6.88 17.23l.11.1a1 1 0 0 0 1.41-1.42l-.11-.09A8 8 0 1 1 20 12a1 1 0 0 0 2 0A10 10 0 0 0 12 2z"/><path d="M12 6a6 6 0 0 0-4.13 10.34l.11.1a1 1 0 1 0 1.41-1.42l-.11-.09A4 4 0 1 1 16 12a1 1 0 0 0 2 0 6 6 0 0 0-6-6z"/><circle cx="12" cy="12" r="1.5"/></svg>
+                            <span>Acceso con Huella Digital (Touch ID / Windows Hello)</span>
+                        </h4>
+                        <p id="settings-bio-status-text" style="font-size: 0.825rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+                            Comprobando compatibilidad de hardware...
+                        </p>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button" id="btn-toggle-biometrics-settings" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.45rem 0.85rem; min-height: 38px;">
+                                <span>Activar Huella en este Dispositivo</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 0.5rem 0;">
+
+                    <div style="background: var(--danger-bg); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--danger-border);">
+                        <h4 style="font-size: 0.95rem; color: var(--danger); font-weight: 700; margin-bottom: 0.35rem;">Zona de Peligro: Destrucción Local</h4>
+                        <p style="font-size: 0.825rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
+                            Elimina completamente la base de datos IndexedDB local. Se perderán todas las credenciales si no cuentas con un respaldo.
+                        </p>
+                        <button type="button" id="btn-danger-reset-vault" class="btn btn-danger-outline" style="width: 100%;">
+                            <span>Destruir Bóveda Local (Restablecimiento de Fábrica)</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 8: MODAL DE OPCIONES DE IMPRESIÓN Y REPORTE
+         ====================================================================== -->
+    <div id="modal-print-options" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-print-title">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="modal-print-title" class="modal-title">Generación de Reporte e Impresión</h3>
+                <button type="button" class="btn-icon close-modal" title="Cerrar modal" aria-label="Cerrar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Configura la presentación del reporte de auditoría antes de enviarlo a la impresora o exportarlo como PDF.
+                </p>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="print-scope-select">Alcance del Reporte:</label>
+                    <select id="print-scope-select" class="form-control">
+                        <option value="filtered">Credenciales en pantalla actual (según búsqueda y filtros)</option>
+                        <option value="all">Todas las credenciales custodiadas en la bóveda</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" for="print-privacy-select">Privacidad de las Contraseñas en el Reporte:</label>
+                    <select id="print-privacy-select" class="form-control">
+                        <option value="masked" selected>Enmascaradas (••••••••) - Recomendado para custodia física</option>
+                        <option value="unmasked">En texto claro - Exclusivo para inventario clasificado de emergencia</option>
+                    </select>
+                </div>
+
+                <div style="background: var(--info-bg); padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid #bae6fd; font-size: 0.825rem; color: #0369a1;">
+                    <strong>Formato Limpio:</strong> El reporte eliminará automáticamente los menús, botones, barras de navegación y modales, generando una tabla estructurada lista para papel o PDF.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cancelar</button>
+                <button type="button" id="btn-execute-print" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    <span>Imprimir / Guardar PDF</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 9: CONTENEDOR ESPECIALIZADO DE IMPRESIÓN (@media print)
+         ====================================================================== -->
+    <div id="print-report-container" class="print-report-container">
+        <div class="print-header">
+            <div class="print-title">
+                <h1>Reporte de Auditoría de Credenciales</h1>
+                <p>Custodio Local Criptográfico | Sistema Zero-Knowledge en Cliente</p>
+            </div>
+            <div class="print-audit-meta">
+                <div><strong>Usuario / Operador:</strong> <span id="print-meta-operator">Operador Autorizado</span></div>
+                <div><strong>Fecha y Hora de Emisión:</strong> <span id="print-meta-date">-</span></div>
+                <div><strong>Total Registros Impresos:</strong> <span id="print-meta-count">0</span></div>
+            </div>
+        </div>
+
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">#</th>
+                    <th style="width: 22%;">Servicio / Plataforma</th>
+                    <th style="width: 20%;">User</th>
+                    <th style="width: 22%;">Contraseña</th>
+                    <th style="width: 14%;">Categoría / URL</th>
+                    <th style="width: 18%;">Notas / Observaciones</th>
+                </tr>
+            </thead>
+            <tbody id="print-table-body">
+                <!-- Se inyecta dinámicamente al momento de imprimir -->
+            </tbody>
+        </table>
+
+        <div class="print-footer">
+            <span class="confidential-watermark">CONFIDENCIAL — DOCUMENTO CLASIFICADO</span>
+            <span>Generado localmente sin intervención de servidores externos.</span>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 10: CONTENEDOR DE NOTIFICACIONES TOAST
+         ====================================================================== -->
+    <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+    <!-- Script Principal (Módulo ES6) -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

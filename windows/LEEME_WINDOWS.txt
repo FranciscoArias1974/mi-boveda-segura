@@ -1,0 +1,17 @@
+========================================================
+   🛡️ CUSTODIO DE CREDENCIALES - INSTALADOR PARA WINDOWS
+========================================================
+
+¡Hola! Para instalar la aplicación en cualquier computadora con Windows:
+
+PASOS DE INSTALACIÓN:
+1. Haz doble clic en el archivo "Instalar_en_Windows.bat".
+2. La pantalla negra copiará los archivos y creará automáticamente
+   un icono en tu Escritorio llamado "Custodio Credenciales".
+3. ¡Listo! Ya puedes abrirlo siempre desde tu Escritorio como cualquier
+   otro programa, sin ventanas negras molestas.
+
+SI NO DESEAS INSTALAR Y PREFIERES USARLO DESDE UNA USB O CARPETA:
+- Solo haz doble clic en "iniciar_portable_windows.bat".
+
+¡Compatible con Windows Hello para desbloquear con tu huella digital!

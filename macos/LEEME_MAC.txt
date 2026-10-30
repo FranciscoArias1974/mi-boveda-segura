@@ -1,0 +1,18 @@
+========================================================
+   🛡️ CUSTODIO DE CREDENCIALES - INSTALADOR PARA MAC
+========================================================
+
+¡Hola! Para instalar la aplicación en tu Mac (MacBook Air, MacBook Pro o iMac),
+tienes dos opciones facilísimas:
+
+OPCIÓN 1 (Automática con 1 clic):
+1. Haz doble clic en el archivo "Instalar_en_Mac.command".
+2. Listo, se copiará a tu carpeta de Aplicaciones y creará un acceso
+   directo en tu Escritorio.
+
+OPCIÓN 2 (Manual):
+1. Arrastra la aplicación "Custodio Credenciales.app" a tu carpeta
+   de Aplicaciones en Finder.
+2. Hazle doble clic para abrirla.
+
+¡Podrás usar Touch ID con tu huella digital para ingresar al instante!

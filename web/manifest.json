@@ -1,0 +1,18 @@
+{
+  "name": "Custodio Local de Credenciales",
+  "short_name": "Custodio",
+  "description": "Bóveda local segura de credenciales con cifrado AES-256 y autenticación biométrica.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f2942",
+  "theme_color": "#0f2942",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

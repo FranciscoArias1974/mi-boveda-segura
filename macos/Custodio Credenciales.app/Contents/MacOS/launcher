@@ -1,0 +1,12 @@
+#!/bin/bash
+APP_DIR="$(cd "$(dirname "$0")/../Resources/app" && pwd)"
+cd "$APP_DIR" || exit 1
+
+# Comprobar si el servidor local ya está respondiendo
+if ! nc -z 127.0.0.1 8000 2>/dev/null; then
+    python3 -m http.server 8000 &
+    SERVER_PID=$!
+    sleep 0.8
+fi
+
+open "http://localhost:8000"

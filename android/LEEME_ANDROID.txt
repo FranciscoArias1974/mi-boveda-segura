@@ -1,0 +1,38 @@
+================================================================
+   📱 CUSTODIO DE CREDENCIALES - GUÍA DE INSTALACIÓN EN ANDROID
+================================================================
+
+En Android, las aplicaciones web de alta seguridad no necesitan pasar por la
+tienda Play Store. Se instalan como "Aplicación Web Progresiva" (PWA). Esto
+significa que se comportan exactamente como una app nativa:
+- Tienen su propio icono en la pantalla de inicio y en la lista de apps.
+- Se abren en pantalla completa (sin barra de direcciones ni pestañas).
+- Funcionan 100% sin internet gracias a su Service Worker.
+- Usan el sensor de huella dactilar de tu teléfono Android para desbloquearse.
+
+----------------------------------------------------------------
+MÉTODO 1: INSTALACIÓN RÁPIDA VÍA WI-FI (RECOMENDADO)
+----------------------------------------------------------------
+1. Conecta tu teléfono Android a la misma red Wi-Fi de tu computadora.
+2. En tu computadora (dentro de esta carpeta), haz doble clic en:
+   - "compartir_para_android.command" (si estás en Mac)
+   - "compartir_para_android.bat" (si estás en Windows)
+3. La pantalla te mostrará una dirección parecida a:
+   http://192.168.1.103:8000
+4. En tu teléfono Android, abre Google Chrome y escribe esa dirección.
+5. Verás tu bóveda en pantalla. Ahora:
+   - Toca los 3 puntitos de la esquina superior derecha de Chrome (⋮).
+   - Toca la opción "Instalar aplicación" (o "Agregar a pantalla principal").
+6. ¡Listo! Ya tienes la app instalada en tu Android. Puedes cerrar el servidor
+   de la computadora; la app seguirá abriéndose en tu Android gracias al caché.
+
+----------------------------------------------------------------
+MÉTODO 2: USAR LA APP 100% DENTRO DE ANDROID (SIN COMPUTADORA)
+----------------------------------------------------------------
+Si deseas tener los archivos guardados físicamente en la memoria de tu teléfono:
+1. Copia la carpeta "app" en el almacenamiento interno de tu teléfono Android.
+2. Descarga gratis desde Google Play Store una mini app como "Simple HTTP Server"
+   o "KSWEB".
+3. Selecciona la carpeta "app" y dale a "Start".
+4. Abre Chrome en tu teléfono en http://localhost:8080 y dale a "Instalar aplicación".
+5. ¡Quedará instalada como app nativa con soporte de huella digital!
